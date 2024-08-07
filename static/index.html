@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat Application</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            background-color: #e5ddd5;
+            margin: 0;
+        }
+        #chat-container {
+            width: 80%;
+            max-width: 600px;
+            border: 1px solid #ccc;
+            border-radius: 8px;
+            background-color: #fff;
+            padding: 10px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            display: flex;
+            flex-direction: column;
+        }
+        #chat {
+            list-style-type: none;
+            padding: 0;
+            height: 400px;
+            overflow-y: auto; /* Allow scrolling */
+            border-bottom: 1px solid #ccc;
+            margin-bottom: 10px;
+            display: flex;
+            flex-direction: column-reverse; /* Latest message at the bottom */
+        }
+        #chat li {
+            margin-bottom: 10px;
+            padding: 8px 10px;
+            border-radius: 10px;
+            max-width: 70%;
+            word-wrap: break-word;
+            display: inline-block;
+        }
+        #chat .self {
+            background-color: #dcf8c6;
+            align-self: flex-end;
+            text-align: right;
+            margin-left: auto;
+        }
+        #chat .other {
+            background-color: #fff;
+            align-self: flex-start;
+            border: 1px solid #f1f1f1;
+            margin-right: auto;
+        }
+        #message-form {
+            display: flex;
+        }
+        #message-form input {
+            flex: 1;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            outline: none;
+        }
+        #message-form button {
+            padding: 10px 20px;
+            border: none;
+            background-color: #007bff;
+            color: #fff;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-left: 10px;
+            outline: none;
+        }
+        #message-form button:hover {
+            background-color: #0056b3;
+        }
+    </style>
+</head>
+<body>
+<div id="chat-container">
+    <ul id="chat"></ul>
+    <form id="message-form">
+        <input type="text" id="message-input" placeholder="Enter message..." autocomplete="off" required>
+        <button type="submit">Send</button>
+    </form>
+</div>
+
+<script>
+    let ws;
+    let username;
+    let topic;
+    let isUsernameSet = false;
+
+    function connect() {
+        ws = new WebSocket('ws://localhost:8080/ws');
+        ws.onopen = function () {
+            if (!isUsernameSet) {
+                topic = prompt("Enter the chat topic:");
+                if (topic) {
+                    ws.send(JSON.stringify({ type: "setTopic", topic: topic }));
+                    username = prompt("Enter your username:");
+                    if (username) {
+                        ws.send(JSON.stringify({ type: "setUsername", topic: topic, data: username }));
+                        isUsernameSet = true;
+                    }
+                }
+            }
+        };
+
+        ws.onmessage = function (event) {
+            const chat = document.getElementById('chat');
+            const message = JSON.parse(event.data);
+            const li = document.createElement('li');
+            const messageTime = new Date().toLocaleTimeString();
+            li.textContent = `${message.username} (${messageTime}): ${message.data}`;
+
+            // 添加消息的样式
+            if (message.username === username) {
+                li.classList.add('self'); // 发送的消息
+            } else {
+                li.classList.add('other'); // 接收的消息
+            }
+
+            // 插入新消息到顶部
+            chat.insertBefore(li, chat.firstChild);
+        };
+
+        ws.onclose = function () {
+            setTimeout(connect, 1000);
+        };
+    }
+
+    connect();
+
+    document.getElementById('message-form').onsubmit = function (event) {
+        event.preventDefault();
+        const input = document.getElementById('message-input');
+        if (input.value) {
+            // 发送消息到服务器
+            ws.send(JSON.stringify({ type: "message", topic: topic, data: input.value }));
+            input.value = '';
+        }
+    };
+</script>
+</body>
+</html>
